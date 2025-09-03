@@ -9,7 +9,6 @@ load_dotenv()
 def create_database_and_table():
     """데이터베이스와 테이블 생성"""
     try:
-        # MySQL 서버에 연결 (데이터베이스 없이)
         connection = mysql.connector.connect(
             host=os.getenv('DB_HOST', 'localhost'),
             port=int(os.getenv('DB_PORT', 3306)),

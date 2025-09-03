@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 화재 감지 시스템</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- 헤더 -->
+        <div class="header">
+            <h1>🔥 실시간 환경 모니터링 및 화재 위험 분석</h1>
+        </div>
+
+        <!-- 통계 카드 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-content">
+                    <h3>총 데이터 수</h3>
+                    <div class="stat-value" id="totalData">-</div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">📱</div>
+                <div class="stat-content">
+                    <h3>활성 장치</h3>
+                    <div class="stat-value" id="deviceCount">-</div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">🌡️</div>
+                <div class="stat-content">
+                    <h3>평균 온도 (°C)</h3>
+                    <div class="stat-value" id="avgTemp">-</div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">🔥</div>
+                <div class="stat-content">
+                    <h3>화재 위험 감지</h3>
+                    <div class="stat-value" id="fireRiskLevel">-</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 삭제 버튼 -->
+        <div class="action-buttons">
+            <button id="deleteButton" class="delete-btn">🗑️ 모든 데이터 삭제</button>
+        </div>
+
+        <!-- 화재 위험도 표시 -->
+        <div class="fire-risk-section">
+            <div id="fireRiskDisplay" class="fire-risk low">
+                화재 위험도: 낮음
+            </div>
+        </div>
+
+        <!-- 최신 센서 데이터 -->
+        <div class="section">
+            <h2>📊 최신 센서 데이터</h2>
+            <div class="sensor-grid">
+                <div class="sensor-card">
+                    <h3>온도</h3>
+                    <div class="sensor-value" id="temperature">-°C</div>
+                </div>
+                <div class="sensor-card">
+                    <h3>습도</h3>
+                    <div class="sensor-value" id="humidity">-%</div>
+                </div>
+                <div class="sensor-card">
+                    <h3>eCO2</h3>
+                    <div class="sensor-value" id="eco2">-ppm</div>
+                </div>
+                <div class="sensor-card">
+                    <h3>TVOC</h3>
+                    <div class="sensor-value" id="tvoc">-ppb</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 활성 장치 -->
+        <div class="section">
+            <h2>📱 활성 장치</h2>
+            <div id="devicesList" class="devices-list">
+                <div class="device-item">
+                    <span class="device-status online"></span>
+                    <span class="device-name">esp32_fire_detector_01</span>
+                    <span class="device-info">온도: -°C 습도: -% 마지막: -</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 마지막 업데이트 시간 -->
+        <div class="footer">
+            <p>마지막 업데이트: <span id="lastUpdate">-</span></p>
+        </div>
+    </div>
+
+    <script>
+        // 한국어 위험도 변환 함수
+        function getRiskLevelKorean(level) {
+            const levelMap = {
+                "LOW": "낮음",
+                "MEDIUM": "보통", 
+                "HIGH": "높음",
+                "CRITICAL": "위험"
+            };
+            return levelMap[level] || level;
+        }
+
+        // 대시보드 업데이트 함수
+        function updateDashboard() {
+            // 최신 데이터 가져오기
+            fetch('/latest')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.latest_data) {
+                        const sensorData = data.latest_data;
+                        
+                        // 센서 데이터 업데이트
+                        document.getElementById('temperature').textContent = `${sensorData.temperature}°C`;
+                        document.getElementById('humidity').textContent = `${sensorData.humidity}%`;
+                        document.getElementById('eco2').textContent = `${sensorData.eco2}ppm`;
+                        document.getElementById('tvoc').textContent = `${sensorData.tvoc}ppb`;
+                        
+                        // 마지막 업데이트 시간
+                        const now = new Date();
+                        document.getElementById('lastUpdate').textContent = 
+                            now.toLocaleString('ko-KR', {
+                                year: 'numeric',
+                                month: '2-digit', 
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit'
+                            });
+                    }
+                })
+                .catch(error => {
+                    console.error('최신 데이터 가져오기 오류:', error);
+                });
+
+            // 화재 위험도 체크
+            fetch('/fire-check')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.fire_risk_analysis) {
+                        const fireRisk = data.fire_risk_analysis;
+                        const riskDisplay = document.getElementById('fireRiskDisplay');
+                        const riskLevel = document.getElementById('fireRiskLevel');
+                        
+                        // 화재 위험도 표시
+                        const koreanRisk = getRiskLevelKorean(fireRisk.risk_level);
+                        riskDisplay.className = `fire-risk ${fireRisk.risk_level.toLowerCase()}`;
+                        riskDisplay.textContent = `화재 위험도: ${koreanRisk} (점수: ${fireRisk.risk_score})`;
+                        riskLevel.textContent = koreanRisk;
+                    }
+                })
+                .catch(error => {
+                    console.error('화재 위험도 체크 오류:', error);
+                });
+
+            // 통계 데이터 가져오기
+            fetch('/stats')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.statistics) {
+                        const stats = data.statistics;
+                        document.getElementById('totalData').textContent = stats.total_records || 0;
+                        document.getElementById('deviceCount').textContent = stats.device_count || 0;
+                        document.getElementById('avgTemp').textContent = 
+                            stats.avg_temperature ? `${parseFloat(stats.avg_temperature).toFixed(1)}°C` : '-';
+                    }
+                })
+                .catch(error => {
+                    console.error('통계 데이터 가져오기 오류:', error);
+                });
+
+            // 장치 목록 가져오기
+            fetch('/devices')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.devices && data.devices.length > 0) {
+                        const devicesList = document.getElementById('devicesList');
+                        devicesList.innerHTML = '';
+                        
+                        data.devices.forEach(device => {
+                            const deviceItem = document.createElement('div');
+                            deviceItem.className = 'device-item';
+                            deviceItem.innerHTML = `
+                                <span class="device-status online"></span>
+                                <span class="device-name">${device.device_id}</span>
+                                <span class="device-info">데이터: ${device.data_count}개 마지막: ${new Date(device.last_data).toLocaleString('ko-KR')}</span>
+                            `;
+                            devicesList.appendChild(deviceItem);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('장치 목록 가져오기 오류:', error);
+                });
+        }
+
+        // 데이터 삭제 함수
+        function deleteAllData() {
+            if (confirm('정말로 모든 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+                fetch('/clear', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert(data.message);
+                        updateDashboard(); // 대시보드 새로고침
+                    } else {
+                        alert('삭제 실패: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('삭제 오류:', error);
+                    alert('삭제 중 오류가 발생했습니다.');
+                });
+            }
+        }
+
+        // 이벤트 리스너
+        document.addEventListener('DOMContentLoaded', function() {
+            // 삭제 버튼 이벤트
+            document.getElementById('deleteButton').addEventListener('click', deleteAllData);
+            
+            // 초기 로드
+            updateDashboard();
+            
+            // 2초마다 자동 새로고침
+            setInterval(updateDashboard, 2000);
+        });
+    </script>
+</body>
+</html>
