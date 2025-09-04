@@ -54,7 +54,7 @@ def get_latest_sensor_data(device_id=None):
         
         if device_id:
             cursor.execute("""
-                SELECT temperature, humidity, eco2, tvoc, device_id, timestamp, created_at
+                SELECT id, temperature, humidity, eco2, tvoc, device_id, timestamp, created_at
                 FROM sensor_data 
                 WHERE device_id = %s
                 ORDER BY created_at DESC 
@@ -62,7 +62,7 @@ def get_latest_sensor_data(device_id=None):
             """, (device_id,))
         else:
             cursor.execute("""
-                SELECT temperature, humidity, eco2, tvoc, device_id, timestamp, created_at
+                SELECT id, temperature, humidity, eco2, tvoc, device_id, timestamp, created_at
                 FROM sensor_data 
                 ORDER BY created_at DESC 
                 LIMIT 1
